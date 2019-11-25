@@ -45,7 +45,7 @@ u =24.69051* 0.031404688 x_1+ 3.201973*-0.493241676 x_2+ 7.210373*0.008199315x_2
 \end{gather}
 $$
 
-![image](https://raw.githubusercontent.com/learner-wxy/Multivariate-Statistical-Analysis/master/image/CCA_1.png)
+
 
 
 # 显著性检验
