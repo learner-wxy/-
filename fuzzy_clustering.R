@@ -2,7 +2,7 @@
 library(foreign)
 library(cluster)
 
-mydata<-read.spss("./3.7.1Asia.sav") #读取E盘下变量名为3.7.1Asia.sav的SPSS原始数据
+mydata<-read.spss("./3.7.1Asia.sav") 
 mydata
 X<-as.data.frame(mydata)  #转换数据格式
 X
