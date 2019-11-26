@@ -10,6 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(tidyverse)
 library(foreign)
+library(MASS)
 ```
 
 ```{r}
@@ -57,17 +58,50 @@ isigma
 firstrd<-as.matrix(first[,3:10])
 firstrd
 secondrd<-as.matrix(second[,3:10])
-donnot_konowrd<-as.matrix(y[,3:10])
+donnot_konowrd<-as.matrix(donnot_konow[,3:10])
 
 first_judge<-(firstbar-secondbar)%*%isigma%*%t(firstrd)
 first_judge#计算出北京上海得分分别为179.1586 、198.4066都比判别中点109.1717大
 second_judge<-(firstbar-secondbar)%*%isigma%*%t(secondrd)
 second_judge#计算出除北京上海其余得分分别为：47.57496 46.64175 37.627 21.25174 37.21164 30.89321 23.83951 51.85801 39.23608 15.5736 50.93808 21.01187 36.34956 45.03187 35.59145 23.62458 26.07357 7.23423 19.78959 12.35001 16.63631 27.98147 40.75376 27.9821 19.95792 14.643 20.48342
 donnot_konow_judge<-(firstbar-secondbar)%*%isigma%*%t(donnot_konowrd)
-donnot_konow_judge#计算出广东、西藏得分为：40.92931 -19.40572(广东这么低的么)
+donnot_konow_judge#计算出广东、西藏得分为：40.92931 -19.40572(广东这    么低的么)
 ```
 
+# 用包来实现类别的判断与分类
+```{r}
+df <- data %>% 
+  mutate(number = 1:31)%>% #编个号，方便选
+  dplyr::select(number,everything())
+donnot_konow <- df %>%
+  filter( number %in% c(19,26)) #广东、西藏为待判样品
+donnot_konow
+first <- df %>%
+  filter(number %in% c(1,9)) %>% 
+  mutate(genre = 1) %>% #北京上海为1类，顺便这一类的全部标记个1，这个包应该算这个为先验信息，不然没法做
+  dplyr::select(genre,number,everything())
+first
+second <- df %>%
+  filter( !number %in% c(1,9,19,26)) %>% 
+  mutate(genre = 2) %>% #除广东、西藏、北京上海为2类，并且全部标记个2
+  dplyr::select(genre,number,everything())
+second
 
+train_sample <- first %>% #把除了广东与西藏的其余城市合并，开始造作了
+  rbind(second)
+train_sample
+
+params <- lda(genre~x1+x2+x3+x4+x5+x6+x7+x8, data=train_sample)#genre为分类标识，其余为八个指标
+params# 判别函数为 0.0006388214*x1 + 0.0013250299*x2 -0.0015453976*x3  -0.0019589553*x4 +0.0014962902*x5 -0.0003410774*x6  -0.0011726981*x7 -0.0020388069*x8
+        #29个城市得分依次为-10.98538469  -12.51078456 -0.55739557 -0.48343902  0.23097937 1.52871713 0.26389623  0.76463092  1.32363596  -0.89682690  0.10345994 1.97870916  -0.82392271  1.54772684  0.33221626 -0.35585638 0.39229619  1.34066979  1.14658710  2.63960296 1.64459206  2.23417796   1.89448886 0.99538672 -0.01681659 0.99533667 1.63125178 2.05245883 1.58960569
+
+self_predict <-  predict(params)#用这个预测下本来就已经分类的呢，来比较下有没有错，嗯结果是一样的
+cbind(train_sample$genre,self_predict$x,self_predict$class)#第一列为本来的类别，第二列为得分把，第三列为用MASS包计算来的类别
+
+P <- predict(params, donnot_konow)#预测广东与西藏
+cbind(P$x,P$class)#广东与西藏得分为-0.03072896、4.75081654，  看到都被分到了第二类
+
+```
 
 
 
