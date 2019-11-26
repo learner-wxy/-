@@ -1,0 +1,75 @@
+---
+title: "Fisher线性判别函数"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(foreign)
+```
+
+```{r}
+mydata<-read.spss("./例3-5.sav")
+data<-as.data.frame(mydata)
+data
+```
+
+# 两个类别数据，两个待判样本
+```{r}
+df <- data %>% 
+  mutate(number = 1:31)%>% #编个号，方便选
+  dplyr::select(number,everything())
+donnot_konow <- df %>%
+  filter( number %in% c(19,26)) #广东、西藏为待判样品
+donnot_konow
+first <- df %>%
+  filter(number %in% c(1,9)) #北京、上海归为一类
+first
+second <- df %>%
+  filter( !number %in% c(1,9,19,26)) #其余地区为一类
+second
+```
+
+# 下面建立费希尔判别函数，并将广东与西藏归类
+```{r}
+firstbar<-colMeans(first[,3:10])#北京、上海这一类，那八个指标的平均值
+firstbar
+secondbar<-colMeans(second[,3:10])#除北京、上海剩下城市这一类，那八个指标的平均值，
+
+sigmafirst<-cov(first[,3:10])
+sigmafirst
+sigmasecond<-cov(second[,3:10])
+sigmasecond
+sigmafirst*1+sigmasecond*26
+sigma<-(1/27)*(sigmafirst*1+sigmasecond*26)# 合并协方差 = [第一组组数减1*第一组数的协方差矩阵+第二组组数减1*第二组数的协方差矩阵]/两组数总和-2
+isigma<-solve(sigma)#解普通方程组可以用函数solve()，solve()的基本用法是solve(A,b)，其中，A为方程组的系数矩阵，b为方程组的右端。
+isigma
+
+(firstbar-secondbar)%*%isigma #判别函数系数，将数据代入， 
+                             #即得分 =-0.008060849*x1 -0.01671964*x2+0.01950031*x3 +0.02471871*x4 -0.01888066*x5 +0.004303822*x6 +0.01479747*x7+ 0.0257263*x8
+(firstbar-secondbar)%*%isigma%*%(firstbar+secondbar)/2#判别中点,为109.1717
+(firstbar-secondbar)%*%isigma%*%(firstbar-secondbar)#马氏距离，也为最大的特征值 max lambde = (两组平均之差)*sigma* (两组平均之差) =D^2
+
+firstrd<-as.matrix(first[,3:10])
+firstrd
+secondrd<-as.matrix(second[,3:10])
+donnot_konowrd<-as.matrix(y[,3:10])
+
+first_judge<-(firstbar-secondbar)%*%isigma%*%t(firstrd)
+first_judge#计算出北京上海得分分别为179.1586 、198.4066都比判别中点109.1717大
+second_judge<-(firstbar-secondbar)%*%isigma%*%t(secondrd)
+second_judge#计算出除北京上海其余得分分别为：47.57496 46.64175 37.627 21.25174 37.21164 30.89321 23.83951 51.85801 39.23608 15.5736 50.93808 21.01187 36.34956 45.03187 35.59145 23.62458 26.07357 7.23423 19.78959 12.35001 16.63631 27.98147 40.75376 27.9821 19.95792 14.643 20.48342
+donnot_konow_judge<-(firstbar-secondbar)%*%isigma%*%t(donnot_konowrd)
+donnot_konow_judge#计算出广东、西藏得分为：40.92931 -19.40572(广东这么低的么)
+```
+
+
+
+
+
+
+
