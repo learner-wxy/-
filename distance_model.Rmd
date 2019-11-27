@@ -1,0 +1,117 @@
+---
+title: "Untitled"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 距离判别思想是根据已知分类的数据计算各类别的重心，对未知分类的数据，计算它与各类重心的距离，与某个重心距离最近则归于该类
+# 纯公式来的
+```{r}
+x<-read.csv("./例4-2.csv")
+x
+x<-x[,-1]
+x
+a<-as.matrix(x[1:6,2:5])#第一个类别
+a
+mua<-as.matrix(colMeans(a))
+mua
+b<-as.matrix(x[7:14,2:5])#第二个类别
+mub<-as.matrix(colMeans(b))
+c<-as.matrix(x[15:20,2:5])#第三个类别
+muc<-as.matrix(colMeans(c))
+sigma<-(cov(a)*5+cov(b)*7+cov(c)*5)/17#协方差矩阵的估计为cov=((n1-1)cov(x1)+(n1-1)cov(x1)+(n3-1)cov(x3))/(n1+n2+n3-3)，，假设协方差相等cov1=cov2=cov3
+sigma
+invs<-solve(as.matrix(sigma))#计算逆矩阵
+invs
+#for the first group
+onea<-matrix(1,nrow=6,ncol=1)
+da1<-(a-onea%*%t(mua))%*%invs%*%t(a-onea%*%t(mua))
+da2<-(a-onea%*%t(mub))%*%invs%*%t(a-onea%*%t(mub))
+da3<-(a-onea%*%t(muc))%*%invs%*%t(a-onea%*%t(muc))
+diag(da1)##第一组的各样本距离组一的距离
+diag(da2)##第一组的各样本距离组二的距离
+diag(da3)##第一组的各样本距离组三的距离
+##根据上面输出结果可以知道第一组的各样本距离哪个组的距离是最小的
+rbind(diag(da1),diag(da2),diag(da3))#每一列比大小，看类别
+#for the second group
+oneb<-matrix(1,nrow=8,ncol=1)
+db1<-(b-oneb%*%t(mua))%*%invs%*%t(b-oneb%*%t(mua))
+db2<-(b-oneb%*%t(mub))%*%invs%*%t(b-oneb%*%t(mub))
+db3<-(b-oneb%*%t(muc))%*%invs%*%t(b-oneb%*%t(muc))
+diag(db1)
+diag(db2)
+diag(db3)
+rbind(diag(db1),diag(db2),diag(db3))
+#for the third group
+onec<-matrix(1,nrow=6,ncol=1)
+dc1<-(c-onec%*%t(mua))%*%invs%*%t(c-onec%*%t(mua))
+dc2<-(c-onec%*%t(mub))%*%invs%*%t(c-onec%*%t(mub))
+dc3<-(c-onec%*%t(muc))%*%invs%*%t(c-onec%*%t(muc))
+diag(dc1)
+diag(dc2)
+diag(dc3)
+rbind(diag(dc1),diag(dc2),diag(dc3))
+##for china mainland and hongkomg
+oney<-matrix(1,nrow=2,ncol=1)
+y<-as.matrix(x[21:22,2:5])
+dy1<-(y-oney%*%t(mua))%*%invs%*%t(y-oney%*%t(mua))
+dy2<-(y-oney%*%t(mub))%*%invs%*%t(y-oney%*%t(mub))
+dy3<-(y-oney%*%t(muc))%*%invs%*%t(y-oney%*%t(muc))
+diag(dy1)
+diag(dy2)
+diag(dy3)
+rbind(diag(dy1),diag(dy2),diag(dy3))#结果显示中国为第一类，香港为第二类
+```
+
+```{r}
+df<-read.csv("./例4-2.csv")
+df
+df<-df[,-1]
+first<-as.matrix(df[1:6,2:5])#1:6是一类，选出来
+first
+second<-as.matrix(df[7:14,2:5])#7:14是一类，选出来，剩余的是一类
+second
+donnot_konow <-as.matrix(df[21:22,2:5])#待判的，指标
+
+ 
+f1<-function(x){
+mu1<-apply(first,2,mean)#向量的样本矩阵的计算
+mu2<-apply(second,2,mean)
+cov1<-cov(first)
+cov2<-cov(second)
+g<-mahalanobis(x,mu2,cov2)-mahalanobis(x,mu1,cov1)#这也是假设了协方差是相等的
+if(g>0) return("和挪威是一类")#书上84页公式看看，这里应该是大于0为mu1那一类，大于0说明与第二个类别的距离比第一个类别大
+else{ 
+if (g<0) return("和乌拉圭是一类")
+else  return("和印度尼西亚是一类")
+}
+}
+ 
+apply(first,1,f1)
+apply(second,1,f1)
+apply(donnot_konow,1,f1)
+```
+
+
+
+# 这个包判断的错太多了吧，正确才0.2，但是也是一种方法
+```{r}
+library(WMDB)
+df<-read.csv("./例4-2.csv")
+df
+df<-df[,-1]
+test<-as.matrix(df[1:20,2:5])#吧这20个已知类别的，他们的指标选出来
+test
+donnot_konow <-as.matrix(df[21:22,2:5])#待判的，指标
+distance <- mahalanobis(test,colMeans(test),cov(test))#算马氏距离
+distance
+all_test <- df %>% 
+  filter(等级 %in% c(1,2,3))#已知类别的
+all
+wmd(test,as.factor(all_test$等级))#第一个是已知类别的数据，后面是他们的类别，输出结果会显示判的类别、判错的样本、判别正确的比例
+wmd(test,as.factor(all_test$等级),TstX = donnot_konow)#判别类型,报错了，估计是不可用
+```
+
