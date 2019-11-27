@@ -65,7 +65,7 @@ diag(dy2)
 diag(dy3)
 rbind(diag(dy1),diag(dy2),diag(dy3))#结果显示中国为第一类，香港为第二类
 ```
-
+# 法二，简洁一点，不过还是包方便
 ```{r}
 df<-read.csv("./例4-2.csv")
 df
