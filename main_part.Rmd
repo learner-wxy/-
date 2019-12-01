@@ -1,0 +1,56 @@
+---
+title: "main_part"
+author: "wxy"
+date: "2019/12/1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(foreign)
+data<-read.spss("./例5-2.sav")
+data
+df <-as.data.frame(data)
+df <- df[,2:9]
+df
+df_zscale <-scale(df)
+df_main <-princomp(df_zscale ,cor=TRUE) #主成分分析 
+df_main
+df_main$loadings
+summary(df_main,loadings=TRUE)  #列出结果 包含特征向量
+y <-eigen(cor(df_zscale)) #求出cor(df_zscale)的特征值和特征向量,
+y#此时输出的结果为8个特征值（有8个变量），输出的特征向量的符号可能与SPSS相反
+sum(y$values[1:5])/sum(y$values)   #求前5个主成分的累计方差贡献率，当然可以改为其他
+df_main$loadings[,1:5]#输出前5个主成分的载荷矩阵
+screeplot(df_main,type='lines')  #画出碎石图
+df_zscale_ma <- as.matrix(df_zscale)# 矩阵相乘要把数据转为num或者matrix
+df_zscale_ma %*% y$vectors[,1]#标准化后的数据乘以第一主成分对应的特征向量作为系数的和，可以此来排分
+```
+
+```{r}
+#判断PCA中需要多少个主成分
+#最常见的是基于特征值的方法，每个主成分都与相关系数矩阵的特征值相关联，常见的方法有Kaiser-Harris准则、Cattell碎石检验和平行分析。使用fa.parallel()函数，可以同时对三种特征值判别准则进行评价。
+library(psych)
+library(foreign)
+data<-read.spss("./例5-2.sav")
+data
+df <-as.data.frame(data)
+df <- df[,2:9]
+df
+df_zscale <-scale(df)
+fa.parallel(df, fa="pc", n.iter=100, show.legend=FALSE, main="Scree plot with parallel analysis")#展示了基于观测特征值的碎石检验（由线段和x符号组成）、根据100个随机数据矩阵推导出来的特征值均值（虚线），以及大于1的特征值准则（y=1的水平线）。三种准则都表明选择一个主成分即可保留数据集的大部分信息
+#principal(r, nfactors=, rotate=, scores=)#其中r是相关系数矩阵或原始数据矩阵，nfactors设定主成分数（默认为1），rotate指定旋转的方法（默认最大方差旋转varimax），scores设定是否需要计算主成分得分（默认不需要）。使用以下代码可以获得USJudgeRatings的第一主成分。
+df_principal <- principal(df, nfactors=1)#PC1栏包含了成分载荷，指观测变量与主成分的相关系数,
+                               #h2栏指成分公因子方差——主成分对每个变量的方差解释度；u2栏指成分唯一性——方差无法被主成分解释的比例（1-h2）。
+df_principal
+
+
+
+# df_zscale_ma <- as.matrix(df_zscale)
+# df_principal[,2]
+# df_zscale_ma %*% df_principal $ PC1#想这么做来着，但是PC1这一列取不出来
+```
+
