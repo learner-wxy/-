@@ -1,0 +1,57 @@
+---
+title: "factor_analysis"
+author: "wxy"
+date: "2019/12/1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 生成碎石图，参考主成分个数
+```{r}
+library(foreign)
+library(psych)
+data<-read.spss("./例5-2.sav")
+data
+df <-as.data.frame(data)
+df <- df[,2:9]
+df
+df_zscale <-scale(df)
+df_zscale_cor <- cor(df_zscale )
+fa.parallel(df_zscale_cor, n.obs = 112, fa = "both", n.iter = 100)
+
+```
+
+# 因子分析
+```{r}
+fa_model4 <- fa(df_zscale_cor, nfactors = 2,rotate = "none", fm = "ml")#fa函数进行主成分分析，fa.parallel函数生成碎石图
+fa_model4
+
+# fa(r, nfactors=, n.obs=, rotate=, scores=, fm=) r:相关系数矩阵或原始数据矩阵， 
+#   nfactors:设定主提取的因子数（默认为1） n.obs:观测数（输入相关系数矩阵时需要填写） 
+#   rotate:设定旋转的方法（默认互变异数最小法） scores:设定是否需要计算因子得分（默认不需要） 
+#   fm:设定因子化方法（默认极小残差法）
+#   
+#   提取公因子的方法（fm），方法包括： ml：最大似然法 pa：主轴迭代法 wls：加权最小二乘法 gls：广义加权最小二乘法 
+
+factor.plot(fa_model4)
+fa.diagram(fa_model4, simple = FALSE)#看出提取两个因子
+```
+
+# 因子旋转：正交旋转
+```{r}
+#使用正交旋转将人为地强制两个因子不相关，使用斜交旋转法则允许两个因子相关。
+fa_model2 <- fa(df_zscale_cor, nfactors = 2, rotate = "varimax", fm = "pa")# varimax表示旋转方式为正交因子旋转
+fa_model2#系数都变了
+ factor.plot(fa_model2)#现在即可直观地看到变量和因子间的相关系数（即因子载荷矩阵）
+ fa.diagram(fa_model4, simple = FALSE)#使用fa.diagram()函数绘制，如果simple=TRUE，那么将仅显示每个因子下的最大载荷，以及因子间的相关系数。
+
+```
+
+# 因子旋转：斜交旋转
+```{r}
+fa.promax <- fa(df_zscale_cor, nfactors=1, rotate="promax", fm="pa")#这里nfactors=2就报错了
+fa.promax#对于正交旋转，因子分析的重点在于因子载荷矩阵（变量和因子的相关系数）；而对于斜交旋转，因子分析会考虑三个矩阵，因子载荷矩阵、因子模式矩阵和因子关联矩阵。因子模式矩阵即PA1那的值，是标准化的回归系数（而不是载荷矩阵中的相关系数）
+```
