@@ -1,0 +1,205 @@
+---
+title: "Untitled"
+output: github_document
+---
+```{r}
+library(ggplot2)
+library(caret)
+library(pROC)
+```
+
+```{r}
+url <- "http://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data"
+
+data <- read.csv(url, header=FALSE)
+```
+
+## 给数据加行名
+```{r}
+head(data) #没行名
+
+colnames(data) <- c(
+  "age",
+  "sex",# 0 = female, 1 = male
+  "cp", # chest pain
+  # 1 = typical angina,
+  # 2 = atypical angina,
+  # 3 = non-anginal pain,
+  # 4 = asymptomatic
+  "trestbps", # resting blood pressure (in mm Hg)
+  "chol", # serum cholestoral in mg/dl
+  "fbs",  # fasting blood sugar if less than 120 mg/dl, 1 = TRUE, 0 = FALSE
+  "restecg", # resting electrocardiographic results
+  # 1 = normal
+  # 2 = having ST-T wave abnormality
+  # 3 = showing probable or definite left ventricular hypertrophy
+  "thalach", # maximum heart rate achieved
+  "exang",   # exercise induced angina, 1 = yes, 0 = no
+  "oldpeak", # ST depression induced by exercise relative to rest
+  "slope", # the slope of the peak exercise ST segment
+  # 1 = upsloping
+  # 2 = flat
+  # 3 = downsloping
+  "ca", # number of major vessels (0-3) colored by fluoroscopy
+  "thal", # this is short of thalium heart scan
+  # 3 = normal (no cold spots)
+  # 6 = fixed defect (cold spots during rest and exercise)
+  # 7 = reversible defect (when cold spots only appear during exercise)
+  "hd" # (the predicted attribute) - diagnosis of heart disease
+  # 0 if less than or equal to 50% diameter narrowing
+  # 1 if greater than 50% diameter narrowing
+)
+```
+
+
+## 数据处理（把？的给踢出去），数据类型的转换
+```{r}
+data[data == "?"] <- NA
+
+## Now add factors for variables that are factors and clean up the factors
+## that had missing data...
+data[data$sex == 0,]$sex <- "F"
+data[data$sex == 1,]$sex <- "M"
+data$sex <- as.factor(data$sex)
+
+data$cp <- as.factor(data$cp)
+data$fbs <- as.factor(data$fbs)
+data$restecg <- as.factor(data$restecg)
+data$exang <- as.factor(data$exang)
+data$slope <- as.factor(data$slope)
+
+data$ca <- as.integer(data$ca) # since this column had "?"s in it
+# R thinks that the levels for the factor are strings, but
+# we know they are integers, so first convert the strings to integiers...
+data$ca <- as.factor(data$ca)  # ...then convert the integers to factor levels
+
+data$thal <- as.integer(data$thal) # "thal" also had "?"s in it.
+data$thal <- as.factor(data$thal)
+
+1## This next line replaces 0 and 1 with "Healthy" and "Unhealthy"
+data$hd <- ifelse(test=data$hd == 0, yes="Healthy", no="Unhealthy")
+data$hd <- as.factor(data$hd) # Now convert to a factor
+
+str(data) ## this shows that the correct columns are factors
+
+## Now determine how many rows have "NA" (aka "Missing data"). If it's just
+## a few, we can remove them from the dataset, otherwise we should consider
+## imputing the values with a Random Forest or some other imputation method.
+nrow(data[is.na(data$ca) | is.na(data$thal),])
+data[is.na(data$ca) | is.na(data$thal),]
+## so 6 of the 303 rows of data have missing values. This isn't a large
+## percentage (2%), so we can just remove them from the dataset
+## NOTE: This is different from when we did machine learning with
+## Random Forests. When we did that, we imputed values.
+nrow(data)
+data <- data[!(is.na(data$ca) | is.na(data$thal)),]
+nrow(data)
+data
+```
+
+## 数据留一手给测试用
+```{r}
+# 数据集分为测试和训练
+data[[10]]
+ind <- createDataPartition(data[[10]], times = 1, p = 0.75, list = FALSE)#前一个文件报错y must have at least 2 data points,这得是个向量，之前是个df
+ind
+df_train <- data[ind, ]#训练模型224个，224/297=0.7542088
+df_train
+df_test <- data[-ind, ]#测试模型可用73个
+df_test
+```
+
+## 所有变量都加在模型里面看看
+```{r}
+logistic_1<-glm(hd~.,data=df_train,family = "binomial")
+summary(logistic_1)
+
+```
+
+## 模型变量选择
+```{r}
+##很多变量并不显著，考虑剔除这些不显著的变量，使用逐步回归法进行变量的选择
+logistic_2 <-step(object = logistic_1,trace = 0)
+summary(logistic_2)
+
+# 结果还算可以吧
+#Call:
+#glm(formula = hd ~ sex + cp + trestbps + restecg + exang + oldpeak + 
+ #   slope + ca + thal, family = "binomial", data = df_train)
+```
+## 模型显著，能通过检验
+```{r}
+#还需确保整个模型是显著的，只有这样才能保证模型是正确的、有意义的，下面对模型进行卡方检验。
+anova(object =logistic_2,test = "Chisq")
+```
+
+```{r}
+#由于两模型嵌套（logistic_2 是 logistic_1的一个子集），可以使用 anova() 函数对它们进行比较，对于广义线性回归，可用卡方检验。
+anova(object =logistic_1, logistic_2,test = "Chisq")
+#P值=0.6073，彼此彼此
+```
+
+
+```{r}
+#虽然模型的偏回归系数和模型均通过显著性检验，但不代表模型能够非常准确的拟合实际值，这就需要对模型进行拟合优度检验，
+#即通过比较模型的预测值与实际值之间的差异情况来进行检验。
+
+#Logistic回归模型的拟合优度检验一般使用偏差卡方检验、皮尔逊卡方检验和HL统计量检验三种方法，其中前两种检验适合模型中只有离散的自变量，
+#而后一种适合模型中包含连续的自变量。拟合优度检验的原假设为“模型的预测值与实际值不存在差异”。
+```
+
+## 模型对样本外数据(测试集)的预测精度
+```{r}
+prob<-predict(object =logistic_2, newdata=df_test,type = "response")
+prob
+pred<-ifelse(prob>=0.5,"unhealthy","healthy")
+pred<-factor(pred,levels = c("unhealthy","healthy"),order=TRUE)
+table(df_test$hd,pred)
+
+#           pred
+#            unhealthy healthy
+#  Healthy           2      29
+#  Unhealthy        31      1
+#结果分析：
+#1)模型对Unhealthy的预测还是非常准确的（31/(31+1)=0.96875）;
+#2)模型对Unhealthy的预测非常不理想（29/(29+2)=0.9354839）
+#3)模型的整体预测准确率为((31+29)/(31+29+2+1)=0.952381)，可。
+
+```
+
+## ROC曲线
+```{r}
+df_roc <- roc(df_test$hd,prob)
+names(df_roc )
+x <- 1-df_roc $specificities
+y <- df_roc $sensitivities
+
+####法一
+ggplot(data = NULL, mapping = aes(x= x, y = y)) +
+  geom_line(colour = 'red') +
+  #geom_abline(intercept = 0, slope = 1) + 
+  annotate('text', x = 0.4, y = 0.5, label =paste('AUC=',round(df_roc$auc,2))) +
+  labs(x = '1-specificities',y = 'sensitivities', title = 'ROC Curve')
+
+
+####法二
+plot(df_roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1, 0.2),
+     grid.col=c("green", "red"), max.auc.polygon=TRUE,
+     auc.polygon.col="skyblue", print.thres=TRUE)
+
+#这里的AUC为ROC曲线和y=0直线之间的面积。在实际应用中，多个模型的比较可以通过面积大小来选择更佳的模型，选择标准是AUC越大越好。对于一个模型而言，一般AUC大于0.88就能够说明模型是比较合理的了。
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
