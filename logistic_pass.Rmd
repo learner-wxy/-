@@ -1,0 +1,115 @@
+---
+title: "Untitled"
+output: github_document
+---
+
+```{r}
+library(glm2)
+library(haven)
+library(tidyverse)
+```
+
+## 想着懒得找数据，就用的这个数据，没想到结果不太行，
+## 总的来说方法没错的，就是这么个套路
+```{r}
+cfps2010child <- read_dta("../cfps/data/2010AllData/cfps2010child_report_nat092014.dta",
+                          encoding = "GB2312"
+)
+```
+
+## 这俩变量之间有点关系的吧，主打性别与存钱
+```{r}
+dfdf <- cfps2010child %>%
+  select(wd4,#是否为孩子教育开始存钱
+         wg307,#孩子经常参加培训活动或课程吗
+         gender,#sex
+         )
+
+```
+
+## 数据筛选
+```{r}
+df <- dfdf %>%
+  filter(wd4 != -1) %>%
+  filter(!wg307 %in% c(-1,-8))
+
+df
+```
+
+## 数据处理
+```{r}
+df<- df %>% mutate(savemoney = if_else(df$wd4 == 1, "yes", "no" ),
+              sex = if_else(df$gender == 1, "M", "F" ))
+df$savemoney <- as.factor(df$savemoney) ############先换在转因子型，后换的或就是chr了，做不了模型
+df$sex<- as.factor(df$sex) 
+df$wg307 <-as.factor(df$wg307) 
+
+
+str(df)
+```
+## 观察观察哪个合适
+```{r}
+xtabs(~ savemoney + sex,data = df)#########看下，觉得性别挺合适的啊，为啥呢为啥呢
+xtabs(~ savemoney+ wg307,data = df)
+
+
+#####        sex
+#savemoney   F   M
+#      no  596 727
+#      yes 191 239
+```
+
+```{r}
+logistic <- glm(savemoney ~ sex, data=df, family="binomial")
+summary(logistic)
+#Coefficients:
+#            Estimate Std. Error z value Pr(>|z|)    
+#(Intercept) -1.13797    0.08315 -13.686   <2e-16 ***
+#sexM         0.02550    0.11168   0.228    0.819
+```
+
+## 系数是怎么计算的
+```{r}
+female_log <- log(191/596)
+female_log
+male_log <- log((239/727) / (191/596))
+male_log
+#[1] -1.137967
+#[1] 0.02550431
+```
+
+## P值与R^2
+```{r}
+ll.null <- logistic$null.deviance/-2
+ll.proposed <- logistic$deviance/-2
+
+##  R^2 = [ LL(Null) - LL(Proposed) ] / LL(Null)
+(ll.null - ll.proposed) / ll.null
+
+## chi-square value = 2*(LL(Proposed) - LL(Null))
+## p-value = 1 - pchisq(chi-square value, df = 2-1)
+1 - pchisq(2*(ll.proposed - ll.null), df=1)
+1 - pchisq((logistic$null.deviance - logistic$deviance), df=1)
+
+#[1] 2.671237e-05
+#[1] 0.8193211
+#[1] 0.8193211 ######哥们儿这不太行啊
+```
+
+## 预测
+```{r}
+predicted_df <- data.frame(
+  probability_savemoney =logistic$fitted.values,
+  sex=df$sex)
+predicted_df
+#看看，全在0.5以下
+```
+## 画图
+```{r}
+ggplot(data=predicted_df, aes(x=sex, y=probability_savemoney)) +
+  geom_point(aes(color=sex), size=5) +
+  xlab("sex") +
+  ylab("Predicted probability ")
+#xtabs(~ probability_wd4 + wf603, data = predicted.data)
+```
+
