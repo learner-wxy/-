@@ -6,6 +6,7 @@ output: github_document
 library(ggplot2)
 library(caret)
 library(pROC)
+library(pROC)
 ```
 
 ```{r}
@@ -156,20 +157,21 @@ pred<-ifelse(prob>=0.5,"unhealthy","healthy")
 pred<-factor(pred,levels = c("unhealthy","healthy"),order=TRUE)
 table(df_test$hd,pred)
 
-#           pred
+#            pred
 #            unhealthy healthy
-#  Healthy           2      29
-#  Unhealthy        31      1
+#Healthy           5      35
+#  Unhealthy        27       6
+
 #结果分析：
-#1)模型对Unhealthy的预测还是非常准确的（31/(31+1)=0.96875）;
-#2)模型对Unhealthy的预测非常不理想（29/(29+2)=0.9354839）
-#3)模型的整体预测准确率为((31+29)/(31+29+2+1)=0.952381)，可。
+#1)模型对Unhealthy的预测（27/(27+6)=0.8181818）;
+#2)模型对healthy的预测（35/(35+5)=0.875）
+#3)模型的整体预测准确率为((27+35)/(27+35+5+6)= 0.8493151)，可。
 
 ```
 
 ## ROC曲线
 ```{r}
-df_roc <- roc(df_test$hd,prob)
+df_roc <- roc(df_test$hd,prod)############prob与pred结果不一样,prob那还是很多离散值，roc可以自己寻找最优（切点处）;改为pred就是固定值（0.818,0.875）了，
 names(df_roc )
 x <- 1-df_roc $specificities
 y <- df_roc $sensitivities
@@ -191,7 +193,43 @@ plot(df_roc, print.auc=TRUE, auc.polygon=TRUE, grid=c(0.1, 0.2),
 
 ```
 
+# 上面就可以告一段落了，
+## 如果有两个模型的话，还可以使用更加强大的pROC包，它可以方便的比较两个分类器，并且能自动标出最优临界点
+### 现在再加一个模型logistic_compare，用来比较
+```{r}
+logistic_compare<-glm(hd ~ ca + thal,data=df_train,family = "binomial")
+summary(logistic_compare)
+```
 
+## 模型logistic_compare对样本外数据(测试集)的预测精度
+```{r}
+prob_compare<-predict(object =logistic_compare, newdata=df_test,type = "response")
+prob_compare
+pred_compare<-ifelse(prob_compare >=0.5,"unhealthy","healthy")
+pred_compare<-factor(pred_compare,levels = c("unhealthy","healthy"),order=TRUE)
+table(df_test$hd,pred_compare)
+
+
+#           pred_compare
+#            unhealthy healthy
+#  Healthy           8      34
+#  Unhealthy        24       7
+#看起来没有logistic_2那么乐观
+```
+
+
+## 使用pROC包，比较两个模型
+```{r}
+df_roc <- roc(df_test$hd,prob)
+df_roc_compare <- roc(df_test$hd,prob_compare)
+# 法一
+roc.test(df_roc, df_roc_compare)
+# 法二
+roc.test(df_roc, df_roc_compare, paired=FALSE, method="bootstrap")# method还有delong，venkatraman，specificity
+
+plot(df_roc,print.auc=TRUE,auc.polygon=TRUE,grid=c(0.1,0.2),grid.col=c("green","red"),max.auc.polygon=TRUE,auc.polygon.col="yellow",print.thres=TRUE)
+plot(df_roc_compare,print.auc=TRUE,auc.polygon=TRUE,grid=c(0.1,0.2),grid.col=c("green","red"),max.auc.polygon=TRUE,auc.polygon.col="pink",print.thres=TRUE)
+```
 
 
 
